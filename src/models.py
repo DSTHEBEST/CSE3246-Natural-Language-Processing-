@@ -105,6 +105,8 @@ def plot_learning_curves(model, model_name, X, y, feature_name):
 
     # For large sparse matrices, subsample for speed
     n_samples = X.shape[0]
+    # Normalise y to a numpy array so indexing works with list, Series, or ndarray
+    y = np.asarray(y)
     if n_samples > 10000:
         # Subsample to 10000 for learning curve computation
         from sklearn.utils import resample
@@ -113,10 +115,10 @@ def plot_learning_curves(model, model_name, X, y, feature_name):
             X_sub = X[indices]
         else:
             X_sub = X[indices]
-        y_sub = y[indices] if isinstance(y, np.ndarray) else y.iloc[indices].values
+        y_sub = y[indices]
     else:
         X_sub = X
-        y_sub = y if isinstance(y, np.ndarray) else y.values
+        y_sub = y
 
     train_sizes = np.linspace(0.1, 1.0, 8)
 

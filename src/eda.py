@@ -44,7 +44,8 @@ def plot_review_length_distribution(df):
     """Plot histogram of review lengths (word count)."""
     set_plot_style()
     df = df.copy()
-    df["review_length"] = df["cleaned_review"].apply(lambda x: len(str(x).split()))
+    text_col = "cleaned_review" if "cleaned_review" in df.columns else "review"
+    df["review_length"] = df[text_col].apply(lambda x: len(str(x).split()))
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
@@ -69,12 +70,13 @@ def plot_review_length_distribution(df):
 def plot_word_clouds(df):
     """Generate word clouds for positive and negative reviews."""
     fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+    text_col = "cleaned_review" if "cleaned_review" in df.columns else "review"
 
     for idx, (label, sent, cmap) in enumerate([
         ("Positive Reviews", 1, "Greens"),
         ("Negative Reviews", 0, "Reds"),
     ]):
-        text = " ".join(df[df["sentiment"] == sent]["cleaned_review"].dropna().tolist())
+        text = " ".join(df[df["sentiment"] == sent][text_col].dropna().tolist())
         wc = WordCloud(width=800, height=400, background_color="white",
                        colormap=cmap, max_words=150, random_state=42)
         wc.generate(text)
@@ -92,11 +94,12 @@ def plot_top_words(df, top_n=20):
     """Plot top N most frequent words for each sentiment class."""
     set_plot_style()
     fig, axes = plt.subplots(1, 2, figsize=(16, 7))
+    text_col = "cleaned_review" if "cleaned_review" in df.columns else "review"
 
     for idx, (label, sent, color) in enumerate([
         ("Positive", 1, "#2ecc71"), ("Negative", 0, "#e74c3c"),
     ]):
-        words = " ".join(df[df["sentiment"] == sent]["cleaned_review"].dropna()).split()
+        words = " ".join(df[df["sentiment"] == sent][text_col].dropna()).split()
         counter = Counter(words).most_common(top_n)
         words_list, counts_list = zip(*counter)
 
@@ -117,7 +120,8 @@ def plot_review_length_boxplot(df):
     """Box plot comparing review lengths across sentiment classes."""
     set_plot_style()
     df = df.copy()
-    df["review_length"] = df["cleaned_review"].apply(lambda x: len(str(x).split()))
+    text_col = "cleaned_review" if "cleaned_review" in df.columns else "review"
+    df["review_length"] = df[text_col].apply(lambda x: len(str(x).split()))
     df["Sentiment"] = df["sentiment"].map({0: "Negative", 1: "Positive"})
 
     fig, ax = plt.subplots(figsize=(8, 5))
@@ -146,13 +150,18 @@ def run_eda(df):
 
 
 def print_dataset_summary(df):
-    """Print a summary table of the dataset."""
+    """
+    Print a summary table of the dataset.
+    Works both before preprocessing (uses 'review') and after (uses 'cleaned_review').
+    """
     print("\n" + "=" * 60)
     print("DATASET SUMMARY")
     print("=" * 60)
 
     df_temp = df.copy()
-    df_temp["review_length"] = df_temp["cleaned_review"].apply(lambda x: len(str(x).split()))
+    text_col = "cleaned_review" if "cleaned_review" in df_temp.columns else "review"
+    print(f"  (measuring length from column: '{text_col}')")
+    df_temp["review_length"] = df_temp[text_col].apply(lambda x: len(str(x).split()))
 
     pos = df_temp[df_temp["sentiment"] == 1]
     neg = df_temp[df_temp["sentiment"] == 0]
