@@ -275,26 +275,36 @@ def main():
 
 
 # =============================================================================
-# BERT / TRANSFORMER CONFIGURATION
+# STEP 10 — DistilBERT TRANSFORMER BASELINE  (optional)
 # =============================================================================
-RUN_BERT = False
+# Set RUN_DISTILBERT = True to run DistilBERT after the classical pipeline.
+# The flag is False by default — the classical pipeline is NEVER affected.
+#
+# Install once:
+#   pip install torch transformers accelerate
+#
+# Laptop-safe defaults (CPU):
+#   train_subset = 5000   → ~2–3 h on CPU, 10–15 min on GPU
+#   batch_size   = 8      → reduce to 4 if you get OOM errors
+#   num_epochs   = 3
+# =============================================================================
+RUN_DISTILBERT = False
 
-BERT_CONFIG = dict(
-    sample_size=2000,
-    num_epochs=3,
-    train_batch_size=16,
-    eval_batch_size=32,
-    max_length=256,
-    use_distilbert=True,
-    gradient_accumulation_steps=2,
-    best_classical={
-        "Model": "Logistic Regression",
-        "Features": "Hybrid",
-        "Accuracy": 0.8952,
-        "Precision": 0.8958,
-        "Recall": 0.8958,
-        "F1-Score": 0.8958,
-        "MCC": 0.7904,
+DISTILBERT_CONFIG = dict(
+    train_subset  = 5000,     # int or None (None = full 39 665 train examples)
+    test_subset   = 1000,     # int or None (None = full 9 917 test examples)
+    num_epochs    = 3,
+    batch_size    = 8,        # increase to 16–32 if you have a GPU
+    max_length    = 256,      # 128 for faster CPU runs; 512 for peak accuracy
+    gradient_accumulation_steps = 2,
+    best_classical = {
+        "Model":     "Logistic Regression",
+        "Features":  "TF-IDF",
+        "Accuracy":  0.8979,
+        "Precision": 0.9003,
+        "Recall":    0.8990,
+        "F1-Score":  0.8996,
+        "MCC":       0.7960,
     },
 )
 
@@ -303,31 +313,36 @@ if __name__ == "__main__":
     main()
 
     # -------------------------------------------------------------------------
-    # Step 10 [OPTIONAL]: DistilBERT / BERT Transformer Experiment
+    # Step 10 [OPTIONAL]: DistilBERT Fine-Tuning
     # -------------------------------------------------------------------------
-    if RUN_BERT:
-        from src.bert_model import run_bert_experiment, train_test_bert_split
-        from src.utils import ensure_dirs
+    # X_train_raw / X_test_raw / y_train / y_test are already produced inside
+    # main() but are local to that function.  We re-create them here from the
+    # same CSV so the split is byte-for-byte identical (same seed=42).
+    if RUN_DISTILBERT:
+        from src.distilbert_model import run_distilbert
+        from src.data_loader import download_and_prepare_dataset as _load
+        from sklearn.model_selection import train_test_split as _split
 
-        print("\n[STEP 10] Running DistilBERT/BERT transformer experiment...")
-        ensure_dirs()
+        print("\n[STEP 10] DistilBERT transformer experiment...")
 
-        # Re-load and deduplicate (identical to Step 1+2 above)
-        _df = download_and_prepare_dataset()
+        _df = _load()
         _df = _df.drop_duplicates(subset=["review"]).reset_index(drop=True)
+        _texts  = _df["review"].tolist()
+        _labels = _df["sentiment"].tolist()
 
-        # Use the SAME 80/20 split — raw texts for tokenizer (no cleaning needed)
-        X_train_text, X_test_text, y_train_bert, y_test_bert = \
-            train_test_bert_split(_df)
-
-        bert_metrics = run_bert_experiment(
-            X_train_text, X_test_text,
-            y_train_bert, y_test_bert,
-            **BERT_CONFIG,
+        _X_tr, _X_te, _y_tr, _y_te = _split(
+            _texts, _labels,
+            test_size=0.2, random_state=42, stratify=_labels,
         )
 
-        if bert_metrics:
-            print("\n[STEP 10] BERT experiment complete.")
-            print(f"  Accuracy : {bert_metrics.get('Accuracy', 'N/A')}")
-            print(f"  F1-Score : {bert_metrics.get('F1-Score', 'N/A')}")
-            print(f"  MCC      : {bert_metrics.get('MCC', 'N/A')}")
+        distilbert_metrics = run_distilbert(
+            _X_tr, _X_te, _y_tr, _y_te,
+            **DISTILBERT_CONFIG,
+        )
+
+        if distilbert_metrics:
+            print("\n[STEP 10] DistilBERT experiment complete.")
+            print(f"  Accuracy : {distilbert_metrics.get('Accuracy', 'N/A')}")
+            print(f"  F1-Score : {distilbert_metrics.get('F1-Score', 'N/A')}")
+            print(f"  MCC      : {distilbert_metrics.get('MCC', 'N/A')}")
+
