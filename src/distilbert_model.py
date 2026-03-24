@@ -71,6 +71,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
+from torch.utils.data import Dataset
 
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score,
@@ -440,7 +441,7 @@ def run_distilbert(
         gradient_accumulation_steps = gradient_accumulation_steps,
         warmup_ratio                = warmup_ratio,
         weight_decay                = weight_decay,
-        evaluation_strategy         = "epoch",
+        eval_strategy               = "epoch",
         save_strategy               = "epoch",
         load_best_model_at_end      = True,
         metric_for_best_model       = "f1",

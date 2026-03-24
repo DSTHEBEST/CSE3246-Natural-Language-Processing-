@@ -249,21 +249,60 @@ def main():
     run_eda(df)
 
     # ------------------------------------------------------------------
-    # Final summary
+    # Step 10: DistilBERT Transformer Baseline
     # ------------------------------------------------------------------
-    print("\n" + "=" * 70)
-    print("  PIPELINE COMPLETE!")
-    print("=" * 70)
-    print(f"  Total experiments : {len(all_results)}")
-    print(f"  Results saved to  : outputs/experimental_results.csv")
-    print(f"  Plots saved to    : outputs/plots/")
+    print("\n[STEP 10] Running DistilBERT transformer baseline...")
+    from src.distilbert_model import run_distilbert
 
     best_key = max(all_results, key=lambda k: all_results[k]["F1-Score"])
     best_metrics = all_results[best_key]
-    print(f"\n  Best Model : {best_key[0]} + {best_key[1]}")
+
+    distilbert_metrics = run_distilbert(
+        X_train_raw, X_test_raw, y_train, y_test,
+        train_subset=5000,
+        test_subset=1000,
+        num_epochs=3,
+        batch_size=8,
+        max_length=256,
+        gradient_accumulation_steps=2,
+        best_classical={
+            "Model":     best_key[0],
+            "Features":  best_key[1],
+            "Accuracy":  best_metrics["Accuracy"],
+            "Precision": best_metrics["Precision"],
+            "Recall":    best_metrics["Recall"],
+            "F1-Score":  best_metrics["F1-Score"],
+            "MCC":       best_metrics["MCC"],
+        },
+    )
+
+    # ------------------------------------------------------------------
+    # Final summary (classical + DistilBERT)
+    # ------------------------------------------------------------------
+    total = len(all_results) + (1 if distilbert_metrics else 0)
+    print("\n" + "=" * 70)
+    print("  PIPELINE COMPLETE!")
+    print("=" * 70)
+    print(f"  Total experiments : {total}")
+    print(f"  Results saved to  : outputs/experimental_results.csv")
+    print(f"  Plots saved to    : outputs/plots/")
+
+    print(f"\n  Best Classical  : {best_key[0]} + {best_key[1]}")
     print(f"    Accuracy : {best_metrics['Accuracy']:.4f}")
     print(f"    F1-Score : {best_metrics['F1-Score']:.4f}")
     print(f"    MCC      : {best_metrics['MCC']:.4f}")
+
+    if distilbert_metrics:
+        print(f"\n  DistilBERT (Contextual Embeddings):")
+        print(f"    Accuracy : {distilbert_metrics['Accuracy']:.4f}")
+        print(f"    F1-Score : {distilbert_metrics['F1-Score']:.4f}")
+        print(f"    MCC      : {distilbert_metrics['MCC']:.4f}")
+        db_acc = distilbert_metrics['Accuracy']
+        cl_acc = best_metrics['Accuracy']
+        delta  = db_acc - cl_acc
+        print(f"\n  DistilBERT vs {best_key[0]} + {best_key[1]}:")
+        print(f"    Δ Accuracy = {delta:+.4f}  "
+              f"({'DistilBERT wins ✓' if delta > 0 else 'Classical wins ✓'})")
 
     if best_metrics["Accuracy"] >= 0.999:
         print("\n  ⚠ ALL MODELS SCORED ~100%.")
@@ -274,75 +313,6 @@ def main():
     print("=" * 70)
 
 
-# =============================================================================
-# STEP 10 — DistilBERT TRANSFORMER BASELINE  (optional)
-# =============================================================================
-# Set RUN_DISTILBERT = True to run DistilBERT after the classical pipeline.
-# The flag is False by default — the classical pipeline is NEVER affected.
-#
-# Install once:
-#   pip install torch transformers accelerate
-#
-# Laptop-safe defaults (CPU):
-#   train_subset = 5000   → ~2–3 h on CPU, 10–15 min on GPU
-#   batch_size   = 8      → reduce to 4 if you get OOM errors
-#   num_epochs   = 3
-# =============================================================================
-RUN_DISTILBERT = False
-
-DISTILBERT_CONFIG = dict(
-    train_subset  = 5000,     # int or None (None = full 39 665 train examples)
-    test_subset   = 1000,     # int or None (None = full 9 917 test examples)
-    num_epochs    = 3,
-    batch_size    = 8,        # increase to 16–32 if you have a GPU
-    max_length    = 256,      # 128 for faster CPU runs; 512 for peak accuracy
-    gradient_accumulation_steps = 2,
-    best_classical = {
-        "Model":     "Logistic Regression",
-        "Features":  "TF-IDF",
-        "Accuracy":  0.8979,
-        "Precision": 0.9003,
-        "Recall":    0.8990,
-        "F1-Score":  0.8996,
-        "MCC":       0.7960,
-    },
-)
-
-
 if __name__ == "__main__":
     main()
-
-    # -------------------------------------------------------------------------
-    # Step 10 [OPTIONAL]: DistilBERT Fine-Tuning
-    # -------------------------------------------------------------------------
-    # X_train_raw / X_test_raw / y_train / y_test are already produced inside
-    # main() but are local to that function.  We re-create them here from the
-    # same CSV so the split is byte-for-byte identical (same seed=42).
-    if RUN_DISTILBERT:
-        from src.distilbert_model import run_distilbert
-        from src.data_loader import download_and_prepare_dataset as _load
-        from sklearn.model_selection import train_test_split as _split
-
-        print("\n[STEP 10] DistilBERT transformer experiment...")
-
-        _df = _load()
-        _df = _df.drop_duplicates(subset=["review"]).reset_index(drop=True)
-        _texts  = _df["review"].tolist()
-        _labels = _df["sentiment"].tolist()
-
-        _X_tr, _X_te, _y_tr, _y_te = _split(
-            _texts, _labels,
-            test_size=0.2, random_state=42, stratify=_labels,
-        )
-
-        distilbert_metrics = run_distilbert(
-            _X_tr, _X_te, _y_tr, _y_te,
-            **DISTILBERT_CONFIG,
-        )
-
-        if distilbert_metrics:
-            print("\n[STEP 10] DistilBERT experiment complete.")
-            print(f"  Accuracy : {distilbert_metrics.get('Accuracy', 'N/A')}")
-            print(f"  F1-Score : {distilbert_metrics.get('F1-Score', 'N/A')}")
-            print(f"  MCC      : {distilbert_metrics.get('MCC', 'N/A')}")
 
