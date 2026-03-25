@@ -1,34 +1,9 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.egg-info/
-dist/
-build/
-*.egg
-
-# Virtual environments
 venv/
-env/
-.venv/
-
-# Data files (large, downloadable)
-data/
-*.csv
-
-# Model files
-outputs/models/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# Agents
-.agents/
+**pycache**/
+outputs/
+logs/
+distilbert_results/
+*.pt
+*.bin
+*.safetensors
+data/cleaned_reviews.csv
