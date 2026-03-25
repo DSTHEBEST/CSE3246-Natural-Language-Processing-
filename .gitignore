@@ -7,3 +7,4 @@ distilbert_results/
 *.bin
 *.safetensors
 data/cleaned_reviews.csv
+outputs/distilbert_checkpoints/
