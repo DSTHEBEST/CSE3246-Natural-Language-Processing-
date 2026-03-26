@@ -1,13 +1,10 @@
-"""
-Utility helper functions for the NLP project.
-"""
+
 import os
 import pickle
 import numpy as np
 
 
 def ensure_dirs():
-    """Create all required output directories."""
     dirs = [
         "data",
         "outputs",
@@ -19,19 +16,16 @@ def ensure_dirs():
 
 
 def save_object(obj, filepath):
-    """Pickle an object to disk."""
     with open(filepath, "wb") as f:
         pickle.dump(obj, f)
 
 
 def load_object(filepath):
-    """Load a pickled object from disk."""
     with open(filepath, "rb") as f:
         return pickle.load(f)
 
 
 def set_plot_style():
-    """Set a consistent, attractive matplotlib style."""
     import matplotlib.pyplot as plt
     plt.style.use("seaborn-v0_8-darkgrid")
     plt.rcParams.update({
