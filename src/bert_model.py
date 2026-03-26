@@ -1,79 +1,3 @@
-"""
-Transformer-Based Sentiment Analysis
-======================================
-Extension module for: Sentiment Analysis of Movie Reviews
-  — From Classical ML to Contextual Transformers (DistilBERT / BERT)
-
-Course: CSE3246 - Natural Language Processing
-
-Overview
---------
-This module adds a DistilBERT (or BERT) fine-tuning experiment that slots
-neatly alongside the existing classical ML pipeline.  Call the public entry
-point `run_bert_experiment()` from main.py, passing the same raw text arrays
-used for classical feature extraction.
-
-Model Choice
-------------
-* Default : distilbert-base-uncased
-    - 40 % fewer parameters than BERT-base
-    - ~60 % faster inference on CPU
-    - Retains ~97 % of BERT-base performance on GLUE benchmarks
-    - **Recommended for laptop / CPU-only environments**
-
-* Optional: bert-base-uncased  (set use_distilbert=False)
-    - Higher ceiling accuracy on large datasets
-    - Requires a CUDA GPU for practical fine-tuning times
-    - Expected convergence: ~3 epochs, 40-60 min on a T4 GPU
-
-Expected Accuracy (IMDb)
-------------------------
-| Setting               | Expected Accuracy |
-|-----------------------|-------------------|
-| Full dataset, GPU     | 92 – 93 %         |
-| Full dataset, CPU     | 91 – 93 %         |
-| 2 000-sample subset   | 88 – 91 %         |
-| 500-sample subset     | 85 – 89 %         |
-
-Compare with classical best: Logistic Regression + Hybrid = 89.52 %
-→ DistilBERT on the full dataset should comfortably exceed this.
-
-Academic Title Suggestion
--------------------------
-"From Bag-of-Words to Transformers: A Comprehensive Comparative Study of
-Classical and Contextual Approaches for Sentiment Analysis of Movie Reviews"
-
-Next Research-Grade Improvement (Post-BERT)
--------------------------------------------
-Domain-Adaptive Pre-Training (DAPT) — Gururangan et al., 2020.
-Continue pre-training DistilBERT on the unlabelled IMDb corpus using
-Masked Language Modelling *before* fine-tuning for sentiment.  This purely
-unsupervised step typically yields +1–2 % accuracy with no additional labels.
-
-Usage
------
-    from src.bert_model import run_bert_experiment, train_test_bert_split
-
-    # Split raw texts from the preprocessed dataframe
-    X_train_text, X_test_text, y_train, y_test = train_test_bert_split(df)
-
-    run_bert_experiment(
-        X_train_text, X_test_text, y_train, y_test,
-        sample_size=2000,        # None → full dataset
-        num_epochs=3,
-        train_batch_size=16,
-        eval_batch_size=32,
-        max_length=256,
-        use_distilbert=True,
-        best_classical={
-            "Model": "Logistic Regression",
-            "Features": "Hybrid",
-            "Accuracy": 0.8952,
-            "F1-Score": 0.8958,
-            "MCC": 0.7904,
-        },
-    )
-"""
 
 import os
 import gc
@@ -93,10 +17,7 @@ from sklearn.metrics import (
 
 warnings.filterwarnings("ignore")
 
-# ---------------------------------------------------------------------------
-# Optional heavy imports — deferred so the rest of the pipeline still works
-# if transformers is not installed.
-# ---------------------------------------------------------------------------
+
 _TRANSFORMERS_AVAILABLE = False
 try:
     import torch
@@ -113,9 +34,7 @@ except ImportError:
     pass  # handled with a friendly error in run_bert_experiment()
 
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
+
 PLOTS_DIR = "outputs/plots"
 RESULTS_CSV = "outputs/experimental_results.csv"
 BERT_OUTPUT_DIR = "outputs/bert_checkpoints"
@@ -124,9 +43,7 @@ DISTILBERT_MODEL = "distilbert-base-uncased"
 BERT_MODEL = "bert-base-uncased"
 
 
-# ---------------------------------------------------------------------------
-# Utility helpers
-# ---------------------------------------------------------------------------
+
 def _ensure_dirs():
     """Create necessary output directories."""
     for d in [PLOTS_DIR, BERT_OUTPUT_DIR]:
@@ -151,26 +68,7 @@ def _set_plot_style():
 
 
 def train_test_bert_split(df, test_size=0.2, random_state=42):
-    """
-    Re-create the same 80/20 train/test split used by the classical pipeline
-    but return raw text strings (not feature vectors) for transformer input.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Preprocessed dataframe with columns 'review' and 'sentiment'.
-    test_size : float
-        Fraction for test split (default 0.2 matches classical pipeline).
-    random_state : int
-        Seed for reproducibility.
-
-    Returns
-    -------
-    X_train_text : list[str]
-    X_test_text  : list[str]
-    y_train      : list[int]
-    y_test       : list[int]
-    """
+  
     texts = df["review"].tolist()
     labels = df["sentiment"].tolist()
     X_tr, X_te, y_tr, y_te = train_test_split(
@@ -183,10 +81,7 @@ def train_test_bert_split(df, test_size=0.2, random_state=42):
 
 
 def _stratified_sample(X_text, y, sample_size, random_state=42):
-    """
-    Return a stratified subsample of ``sample_size`` examples.
-    Class balance is preserved.
-    """
+    
     if sample_size is None or sample_size >= len(X_text):
         return list(X_text), list(y)
     X_arr = np.array(X_text)
@@ -201,20 +96,7 @@ def _stratified_sample(X_text, y, sample_size, random_state=42):
     return X_sub.tolist(), y_sub.tolist()
 
 
-# ---------------------------------------------------------------------------
-# PyTorch Dataset
-# ---------------------------------------------------------------------------
 class IMDbDataset(Dataset):
-    """
-    Minimal torch Dataset wrapping tokenised IMDb reviews.
-
-    Parameters
-    ----------
-    texts   : list[str]  — raw review strings
-    labels  : list[int]  — 0 (negative) / 1 (positive)
-    tokenizer            — HuggingFace tokenizer instance
-    max_length : int     — truncation/padding length
-    """
 
     def __init__(self, texts, labels, tokenizer, max_length=256):
         self.encodings = tokenizer(
@@ -235,14 +117,9 @@ class IMDbDataset(Dataset):
         return item
 
 
-# ---------------------------------------------------------------------------
-# Metrics for HuggingFace Trainer
-# ---------------------------------------------------------------------------
+
 def _build_compute_metrics():
-    """
-    Return a compute_metrics function compatible with HuggingFace Trainer.
-    Computes Accuracy, Precision, Recall, F1, and MCC.
-    """
+   
     def compute_metrics(eval_pred):
         logits, labels = eval_pred
         predictions = np.argmax(logits, axis=-1)
@@ -261,9 +138,6 @@ def _build_compute_metrics():
     return compute_metrics
 
 
-# ---------------------------------------------------------------------------
-# Visualisations
-# ---------------------------------------------------------------------------
 def _plot_bert_confusion_matrix(y_true, y_pred):
     """Save confusion matrix to outputs/plots/cm_bert.png."""
     _set_plot_style()
@@ -287,14 +161,7 @@ def _plot_bert_confusion_matrix(y_true, y_pred):
 
 
 def _plot_bert_vs_classical(bert_metrics, best_classical):
-    """
-    Grouped bar chart: BERT vs best classical model.
-
-    Parameters
-    ----------
-    bert_metrics   : dict  — keys: Accuracy, Precision, Recall, F1-Score, MCC
-    best_classical : dict  — same keys + Model, Features
-    """
+ 
     _set_plot_style()
     metric_keys = ["Accuracy", "Precision", "Recall", "F1-Score", "MCC"]
     bert_vals = [bert_metrics[k] for k in metric_keys]
@@ -370,14 +237,8 @@ def _plot_training_loss(trainer):
         pass  # non-critical visualisation
 
 
-# ---------------------------------------------------------------------------
-# CSV Result Saving
-# ---------------------------------------------------------------------------
 def _save_to_csv(bert_metrics, model_label="BERT"):
-    """
-    Append (or create) a row in outputs/experimental_results.csv.
-    Columns match the format written by evaluation.print_results_table().
-    """
+   
     row = {
         "Model": model_label,
         "Features": "Contextual Embeddings",
@@ -408,9 +269,6 @@ def _save_to_csv(bert_metrics, model_label="BERT"):
     print(f"[BERT] Results appended → {RESULTS_CSV}")
 
 
-# ---------------------------------------------------------------------------
-# Additional granular metrics from confusion matrix
-# ---------------------------------------------------------------------------
 def _full_metrics_from_cm(y_true, y_pred):
     """Compute the extended metric dict that matches compute_all_metrics()."""
     cm = confusion_matrix(y_true, y_pred)
@@ -443,9 +301,7 @@ def _full_metrics_from_cm(y_true, y_pred):
     }
 
 
-# ---------------------------------------------------------------------------
-# Main Public API
-# ---------------------------------------------------------------------------
+
 def run_bert_experiment(
     X_train_text,
     X_test_text,
@@ -463,57 +319,9 @@ def run_bert_experiment(
     gradient_accumulation_steps=2,
     logging_steps=50,
     seed=42,
-    # ---- comparison ----
     best_classical=None,
 ):
-    """
-    Fine-tune DistilBERT (or BERT) for binary sentiment classification and
-    integrate results into the existing pipeline outputs.
-
-    Parameters
-    ----------
-    X_train_text : list[str]
-        Raw training review texts (same split used by classical pipeline).
-    X_test_text  : list[str]
-        Raw test review texts.
-    y_train      : list[int]  (0 = negative, 1 = positive)
-    y_test       : list[int]
-    sample_size  : int or None
-        If int, use a stratified subsample of this many training examples.
-        Set to None to use the full dataset (slow on CPU).
-    num_epochs   : int
-        Number of fine-tuning epochs.
-    train_batch_size : int
-        Per-device training batch size.  Reduce to 8 if OOM on CPU.
-    eval_batch_size  : int
-        Per-device evaluation batch size.
-    max_length   : int
-        Token truncation/padding length.  256 is a good CPU/GPU balance.
-        Use 512 for maximum accuracy on GPU.
-    use_distilbert : bool
-        True  → distilbert-base-uncased (recommended for CPU)
-        False → bert-base-uncased
-    warmup_ratio : float
-        Fraction of steps used for linear LR warm-up.
-    weight_decay : float
-        L2 regularisation coefficient.
-    gradient_accumulation_steps : int
-        Accumulate gradients over N mini-batches before a weight update.
-        Keeps effective batch size large while reducing peak VRAM/RAM.
-    logging_steps : int
-        Log training loss every N steps.
-    seed : int
-        Random seed for reproducibility.
-    best_classical : dict or None
-        Metrics for the best classical model used in the comparison plot.
-        Expected keys: Model, Features, Accuracy, Precision, Recall,
-                       F1-Score, MCC.
-
-    Returns
-    -------
-    dict : BERT evaluation metrics (Accuracy, Precision, Recall, F1-Score, MCC, …)
-    """
-    # ---- guard against missing libraries ----
+   
     if not _TRANSFORMERS_AVAILABLE:
         print(
             "\n[BERT] ERROR: Required libraries not found.\n"
@@ -527,7 +335,6 @@ def run_bert_experiment(
     print("  BERT / TRANSFORMER EXPERIMENT")
     print("=" * 70)
 
-    # ---- device detection ----
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"[BERT] Device       : {device.upper()}")
     use_fp16 = (device == "cuda")
@@ -544,9 +351,7 @@ def run_bert_experiment(
     print(f"[BERT] Train size   : {len(X_train_text)} → subset: {sample_size}")
     print(f"[BERT] Test size    : {len(X_test_text)}")
 
-    # ---- subsample training data (stratified) ----
     X_tr, y_tr = _stratified_sample(X_train_text, y_train, sample_size, seed)
-    # Use at most 20 % of training subset for intermediate eval during training
     val_size = max(50, int(len(X_tr) * 0.1))
     X_tr, X_val, y_tr, y_val = train_test_split(
         X_tr, y_tr,
@@ -556,17 +361,14 @@ def run_bert_experiment(
     )
     print(f"[BERT] Actual train : {len(X_tr)} | val: {len(X_val)} | test: {len(X_test_text)}")
 
-    # ---- load tokenizer ----
     print("[BERT] Loading tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-    # ---- tokenise ----
     print("[BERT] Tokenising datasets...")
     train_dataset = IMDbDataset(X_tr, y_tr, tokenizer, max_length)
     val_dataset = IMDbDataset(X_val, y_val, tokenizer, max_length)
     test_dataset = IMDbDataset(list(X_test_text), list(y_test), tokenizer, max_length)
 
-    # ---- load model ----
     print("[BERT] Loading pre-trained model...")
     model = AutoModelForSequenceClassification.from_pretrained(
         model_name,
@@ -574,7 +376,6 @@ def run_bert_experiment(
         ignore_mismatched_sizes=True,
     )
 
-    # ---- training arguments ----
     training_args = TrainingArguments(
         output_dir=BERT_OUTPUT_DIR,
         num_train_epochs=num_epochs,
@@ -594,13 +395,10 @@ def run_bert_experiment(
         dataloader_pin_memory=(device == "cuda"),
         report_to="none",
         seed=seed,
-        # Disable unnecessary checkpointing to save disk space
         save_total_limit=1,
-        # Suppress the push-to-hub prompt
         push_to_hub=False,
     )
 
-    # ---- trainer ----
     trainer = Trainer(
         model=model,
         args=training_args,
@@ -610,18 +408,15 @@ def run_bert_experiment(
         callbacks=[EarlyStoppingCallback(early_stopping_patience=2)],
     )
 
-    # ---- train ----
     print("\n[BERT] Starting fine-tuning...")
     trainer.train()
     print("[BERT] Fine-tuning complete.")
 
-    # ---- evaluate on test set ----
     print("\n[BERT] Evaluating on test set...")
     preds_output = trainer.predict(test_dataset)
     y_pred = np.argmax(preds_output.predictions, axis=-1)
     y_true = np.array(list(y_test))
 
-    # ---- compute full metric suite ----
     bert_metrics = _full_metrics_from_cm(y_true, y_pred)
 
     # ---- print results ----
