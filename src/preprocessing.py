@@ -1,25 +1,4 @@
-"""
-Text Preprocessing Module  (CORRECTED)
-========================================
-Fixes over-cleaning that was destroying sentiment signal and reducing
-vocabulary to only ~182 tokens.
 
-Key changes vs original:
-  1. Digits and numeric tokens are KEPT (e.g. "10/10", "7 out of 10")
-  2. Contractions are expanded BEFORE removal (don't → do not)
-  3. min token length raised is not applied blindly — short meaningful
-     words like "ok", "no", "bad" are preserved with len>1 filter
-  4. Negation words (not, no, never…) are explicitly EXCLUDED from
-     stopword removal — they reverse sentiment polarity
-  5. The original raw 'review' column is ALWAYS preserved for VADER/
-     TextBlob lexicon features in the Hybrid feature set
-  6. Cache invalidation: the CLEANED_CSV is only loaded if its row count
-     matches the loaded DataFrame to catch stale caches
-
-IMPORTANT: preprocessing must be applied SEPARATELY to train and test
-texts after the split.  The preprocess_series() helper is stateless
-(no fitting), so calling it on train and test independently is safe.
-"""
 import os
 import re
 import nltk
@@ -29,9 +8,6 @@ from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
 
 
-# ---------------------------------------------------------------------------
-# NLTK resource downloads
-# ---------------------------------------------------------------------------
 def _download_nltk_data():
     resources = ["punkt", "punkt_tab", "stopwords", "wordnet", "omw-1.4",
                  "averaged_perceptron_tagger", "averaged_perceptron_tagger_eng"]
@@ -46,9 +22,6 @@ _download_nltk_data()
 
 CLEANED_CSV = os.path.join("data", "cleaned_reviews.csv")
 
-# ---------------------------------------------------------------------------
-# Negation words — MUST NOT be removed as stopwords (they flip sentiment)
-# ---------------------------------------------------------------------------
 NEGATION_WORDS = {
     "no", "not", "nor", "never", "nobody", "nothing", "nowhere",
     "neither", "hardly", "barely", "scarcely",
@@ -56,16 +29,13 @@ NEGATION_WORDS = {
     "wasnt", "werent", "isnt", "arent", "shouldnt", "wouldnt", "couldnt",
 }
 
-# Build a custom stopword set that preserves negations
 def _build_stopwords():
     sw = set(stopwords.words("english"))
     sw -= NEGATION_WORDS          # remove negation words from the drop-list
     return sw
 
 
-# ---------------------------------------------------------------------------
-# Low-level cleaning helpers
-# ---------------------------------------------------------------------------
+
 def remove_html_tags(text: str) -> str:
     return re.sub(r"<[^>]+>", " ", text)
 
@@ -75,10 +45,7 @@ def remove_urls(text: str) -> str:
 
 
 def expand_contractions(text: str) -> str:
-    """
-    Expand common English contractions so that 'don't' → 'do not',
-    preserving negation signal before stopword removal.
-    """
+
     contractions = {
         r"\bdon't\b": "do not",   r"\bDon't\b": "do not",
         r"\bdoesn't\b": "does not", r"\bDoesn't\b": "does not",
@@ -108,12 +75,7 @@ def expand_contractions(text: str) -> str:
 
 
 def remove_special_chars_keep_digits(text: str) -> str:
-    """
-    Remove punctuation but KEEP digits and letters.
-    Reason: expressions like '10/10', '7 out of 10', '5 stars'
-    carry sentiment information and should not be stripped.
-    """
-    # Keep letters, digits, spaces; remove everything else
+
     return re.sub(r"[^a-zA-Z0-9\s]", " ", text)
 
 
@@ -121,37 +83,12 @@ def normalize_whitespace(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
-# ---------------------------------------------------------------------------
-# Full single-text preprocessor
-# ---------------------------------------------------------------------------
+
 def preprocess_text(text: str,
                     lemmatizer=None,
                     stop_words=None,
                     min_token_len: int = 2) -> str:
-    """
-    Preprocess a single review text.
 
-    Steps:
-        1. Remove HTML tags
-        2. Remove URLs
-        3. Expand contractions (preserves negation)
-        4. Lowercase
-        5. Remove special chars (keep digits)
-        6. Tokenise
-        7. Remove stopwords EXCEPT negation words
-        8. Lemmatise
-        9. Keep tokens with len >= min_token_len
-
-    Args:
-        text           : raw review string
-        lemmatizer     : WordNetLemmatizer instance (created if None)
-        stop_words     : custom stopword set (built if None)
-        min_token_len  : minimum token length to keep (default 2 to
-                         preserve 'no', 'ok', 'bad' etc.)
-
-    Returns:
-        Cleaned, lemmatised string
-    """
     if lemmatizer is None:
         lemmatizer = WordNetLemmatizer()
     if stop_words is None:
@@ -173,16 +110,8 @@ def preprocess_text(text: str,
     return " ".join(tokens)
 
 
-# ---------------------------------------------------------------------------
-# Dataset-level preprocessing
-# ---------------------------------------------------------------------------
 def preprocess_series(texts, lemmatizer=None, stop_words=None):
-    """
-    Preprocess an iterable of texts.  Stateless — safe to call
-    independently on train and test splits.
-
-    Returns: list of cleaned strings (same length as input)
-    """
+  
     if lemmatizer is None:
         lemmatizer = WordNetLemmatizer()
     if stop_words is None:
@@ -195,18 +124,7 @@ def preprocess_series(texts, lemmatizer=None, stop_words=None):
 
 
 def preprocess_dataset(df):
-    """
-    Preprocess the full dataset DataFrame (used before the train/test split).
 
-    Adds a 'cleaned_review' column.  Caches result to CLEANED_CSV,
-    but validates the cache row-count against the input to catch stale files.
-
-    Args:
-        df: DataFrame with at minimum columns ['review', 'sentiment']
-
-    Returns:
-        DataFrame with 'cleaned_review' added
-    """
     # Cache validation — invalidate if row count differs
     if os.path.exists(CLEANED_CSV):
         cached = pd.read_csv(CLEANED_CSV)
@@ -237,38 +155,16 @@ def preprocess_dataset(df):
     return df
 
 
-# ---------------------------------------------------------------------------
-# Dataset integrity checks
-# ---------------------------------------------------------------------------
+
 def run_integrity_checks(df, raw_df=None):
-    """
-    Run and print dataset health diagnostics before proceeding to modelling.
-
-    Checks:
-      1. Duplicate raw reviews
-      2. Duplicate cleaned reviews
-      3. Label leakage (sentiment words in text)
-      4. Vocabulary sanity (via a quick CountVectorizer)
-      5. Average review length
-      6. Class balance
-
-    Args:
-        df     : DataFrame with 'cleaned_review' and 'sentiment' columns.
-        raw_df : Optional original DataFrame before cleaning — used for
-                 a more detailed duplicate check.
-
-    Returns:
-        df_deduped : DataFrame with exact duplicates removed from cleaned_review.
-    """
+ 
     from sklearn.feature_extraction.text import CountVectorizer
 
     print("\n" + "=" * 60)
     print("DATASET INTEGRITY AUDIT")
     print("=" * 60)
 
-    # ------------------------------------------------------------------ #
-    # 1. Duplicate detection
-    # ------------------------------------------------------------------ #
+
     n_raw_dupes = int(df["review"].duplicated().sum()) if "review" in df else None
     n_clean_dupes = int(df["cleaned_review"].duplicated().sum())
 
@@ -283,19 +179,15 @@ def run_integrity_checks(df, raw_df=None):
     else:
         print("  ✓ No cleaned duplicates found.")
 
-    # ------------------------------------------------------------------ #
-    # 2. Label leakage detection
-    # ------------------------------------------------------------------ #
+
     print("\n[CHECK 2] Label leakage detection...")
-    # Check if the word 'positive' or 'negative' appears in cleaned reviews
-    # with high correlation to the actual label
+
     leakage_words = {"positive", "negative", "label", "sentiment"}
     leaked = []
     for w in leakage_words:
         mask = df["cleaned_review"].str.contains(r"\b" + w + r"\b", case=False, na=False)
         count = int(mask.sum())
         if count > 0:
-            # Check if counts are suspiciously correlated with label
             if "sentiment" in df.columns:
                 pos_count = int(df[mask & (df["sentiment"] == 1)].shape[0])
                 neg_count = int(df[mask & (df["sentiment"] == 0)].shape[0])
@@ -307,9 +199,6 @@ def run_integrity_checks(df, raw_df=None):
     else:
         print("  ✓ No obvious label leakage words detected.")
 
-    # ------------------------------------------------------------------ #
-    # 3. Vocabulary sanity
-    # ------------------------------------------------------------------ #
     print("\n[CHECK 3] Vocabulary sanity...")
     sample = df["cleaned_review"].fillna("").tolist()
     cv = CountVectorizer(max_features=50_000, min_df=1)
@@ -334,9 +223,6 @@ def run_integrity_checks(df, raw_df=None):
     top_idx = counts.argsort()[-15:][::-1]
     print(f"  Top 15 tokens: {list(feature_names[top_idx])}")
 
-    # ------------------------------------------------------------------ #
-    # 4. Average review length
-    # ------------------------------------------------------------------ #
     lengths = df["cleaned_review"].fillna("").apply(lambda x: len(str(x).split()))
     avg_len = lengths.mean()
     min_len = lengths.min()
@@ -353,9 +239,7 @@ def run_integrity_checks(df, raw_df=None):
     else:
         print("  ✓ Review length looks realistic.")
 
-    # ------------------------------------------------------------------ #
-    # 5. Class balance
-    # ------------------------------------------------------------------ #
+
     if "sentiment" in df.columns:
         vc = df["sentiment"].value_counts()
         print(f"\n[CHECK 5] Class balance:")
