@@ -1,8 +1,4 @@
-"""
-Evaluation module.
-Computes all required classification metrics and generates visualizations.
-Includes confusion matrices, comparative charts, MCC heatmap, and error analysis.
-"""
+
 import os
 import re
 import numpy as np
@@ -22,16 +18,8 @@ from src.utils import set_plot_style
 PLOTS_DIR = "outputs/plots"
 
 
-# ---------------------------------------------------------------------------
-# Core Metrics Computation
-# ---------------------------------------------------------------------------
 def compute_all_metrics(y_true, y_pred):
-    """
-    Compute all evaluation metrics from the confusion matrix.
 
-    Returns:
-        dict of metric_name -> value
-    """
     cm = confusion_matrix(y_true, y_pred)
     tn, fp, fn, tp = cm.ravel()
 
@@ -72,11 +60,7 @@ def compute_all_metrics(y_true, y_pred):
     }
 
 
-# ---------------------------------------------------------------------------
-# Confusion Matrix Visualization
-# ---------------------------------------------------------------------------
 def plot_confusion_matrix(y_true, y_pred, model_name, feature_name):
-    """Plot and save a confusion matrix heatmap."""
     set_plot_style()
     cm = confusion_matrix(y_true, y_pred)
 
@@ -98,17 +82,10 @@ def plot_confusion_matrix(y_true, y_pred, model_name, feature_name):
     plt.close()
 
 
-# ---------------------------------------------------------------------------
-# Comparative Visualization
-# ---------------------------------------------------------------------------
 def plot_comparative_metrics(all_results):
-    """
-    Plot comparative bar charts for Accuracy, F1-Score, and MCC
-    across all model-feature combinations.
-    """
+
     set_plot_style()
 
-    # Prepare data
     rows = []
     for (model_name, feat_name), metrics in all_results.items():
         rows.append({
@@ -123,7 +100,6 @@ def plot_comparative_metrics(all_results):
         })
     df = pd.DataFrame(rows)
 
-    # 1. Grouped bar chart — Accuracy, F1, MCC
     fig, ax = plt.subplots(figsize=(16, 7))
     x = np.arange(len(df))
     width = 0.25
@@ -144,7 +120,6 @@ def plot_comparative_metrics(all_results):
     ax.legend()
     ax.set_ylim(0, 1.15)
 
-    # Add value labels
     for bars in [bars1, bars2, bars3]:
         for bar in bars:
             h = bar.get_height()
@@ -156,7 +131,6 @@ def plot_comparative_metrics(all_results):
     plt.close()
     print("[EVAL] Saved comparative_metrics.png")
 
-    # 2. All metrics per model grouped by feature
     fig, axes = plt.subplots(1, 3, figsize=(18, 6))
     metrics_to_plot = ["Accuracy", "Precision", "Recall"]
 
@@ -189,14 +163,8 @@ def plot_comparative_metrics(all_results):
     print("[EVAL] Saved per_metric_comparison.png")
 
 
-# ---------------------------------------------------------------------------
-# MCC Heatmap (NOVEL CONTRIBUTION)
-# ---------------------------------------------------------------------------
 def plot_mcc_heatmap(all_results):
-    """
-    Plot a heatmap of MCC values: Models × Feature Types.
-    This is the Cross-Representation Stability Analysis.
-    """
+ 
     set_plot_style()
 
     models = sorted(set(k[0] for k in all_results.keys()))
@@ -225,18 +193,8 @@ def plot_mcc_heatmap(all_results):
     print("[EVAL] Saved mcc_heatmap.png")
 
 
-# ---------------------------------------------------------------------------
-# Error Analysis (NOVEL CONTRIBUTION)
-# ---------------------------------------------------------------------------
 def error_analysis(df, y_true, y_pred, model_name, feature_name):
-    """
-    Perform misclassification error analysis with linguistic patterns.
-
-    Analyzes:
-    - Review length differences (misclassified vs correct)
-    - Presence of negation words in misclassified reviews
-    - Mixed sentiment patterns
-    """
+ 
     set_plot_style()
     print(f"\n  [ERROR ANALYSIS] {model_name} + {feature_name}")
 
@@ -248,7 +206,6 @@ def error_analysis(df, y_true, y_pred, model_name, feature_name):
     df_analysis["review_length"] = df_analysis["cleaned_review"].apply(
         lambda x: len(str(x).split()))
 
-    # Negation words analysis
     negation_words = {"not", "no", "never", "neither", "nobody", "nothing",
                       "nowhere", "nor", "cannot", "cant", "wont", "dont",
                       "doesnt", "didnt", "wasnt", "werent", "isnt", "arent",
@@ -275,7 +232,6 @@ def error_analysis(df, y_true, y_pred, model_name, feature_name):
     print(f"    Avg negation words (correct):   {correct['negation_count'].mean():.2f}")
     print(f"    Avg negation words (incorrect): {incorrect['negation_count'].mean():.2f}")
 
-    # Visualization: length distribution of correct vs incorrect
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
     axes[0].hist(correct["review_length"], bins=40, alpha=0.7, color="#2ecc71",
@@ -287,7 +243,6 @@ def error_analysis(df, y_true, y_pred, model_name, feature_name):
     axes[0].set_ylabel("Frequency")
     axes[0].legend()
 
-    # Negation count comparison
     categories = ["Correct", "Misclassified"]
     neg_means = [correct["negation_count"].mean(), incorrect["negation_count"].mean()]
     axes[1].bar(categories, neg_means, color=["#2ecc71", "#e74c3c"], edgecolor="white")
@@ -308,9 +263,6 @@ def error_analysis(df, y_true, y_pred, model_name, feature_name):
     print(f"    Saved {filename}")
 
 
-# ---------------------------------------------------------------------------
-# Results Table
-# ---------------------------------------------------------------------------
 def print_results_table(all_results):
     """Print a comprehensive results table for all model-feature combinations."""
     print("\n" + "=" * 80)
@@ -335,7 +287,6 @@ def print_results_table(all_results):
 
     print(tabulate(rows, headers=headers, tablefmt="grid", floatfmt=".4f"))
 
-    # Also save as CSV
     results_df = pd.DataFrame(rows, columns=headers)
     results_df.to_csv("outputs/experimental_results.csv", index=False)
     print("\n[EVAL] Results saved to outputs/experimental_results.csv")
