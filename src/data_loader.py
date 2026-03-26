@@ -1,16 +1,4 @@
-"""
-Data Loading Module  (CORRECTED — no synthetic fallback)
-==========================================================
-Always loads real IMDb reviews from HuggingFace.
 
-Realism checks:
-  - avg review length >= 50 words
-  - vocabulary size  >= 5 000 unique tokens
-  - row count        >= 40 000
-
-If the local CSV fails any check, it is deleted and re-downloaded.
-Synthetic fallback has been REMOVED permanently.
-"""
 import os
 import re
 import pandas as pd
@@ -18,19 +6,14 @@ import pandas as pd
 DATA_DIR  = "data"
 CSV_PATH  = os.path.join(DATA_DIR, "imdb_reviews.csv")
 
-# ---------------------------------------------------------------------------
-# Realism thresholds  (tuned for real 50K IMDb reviews)
-# ---------------------------------------------------------------------------
+
 MIN_AVG_LEN    = 50      # words per review (raw, before cleaning)
 MIN_VOCAB_SIZE = 5_000   # unique whitespace-split tokens
 MIN_ROWS       = 40_000  # combined train + test = 50 000
 
 
 def _quick_realism_check(df):
-    """
-    Returns (is_real: bool, reason: str).
-    Fails fast on any threshold breach.
-    """
+    
     n = len(df)
     if n < MIN_ROWS:
         return False, f"only {n:,} rows (need >= {MIN_ROWS:,})"
@@ -39,7 +22,6 @@ def _quick_realism_check(df):
     if avg_len < MIN_AVG_LEN:
         return False, f"avg review length {avg_len:.1f} words (need >= {MIN_AVG_LEN})"
 
-    # Vocabulary check on a 5 000-row sample for speed
     sample = df["review"].dropna().sample(min(5_000, n), random_state=42)
     tokens = set()
     for text in sample:
@@ -52,13 +34,7 @@ def _quick_realism_check(df):
 
 
 def _download_real_imdb():
-    """
-    Download the real IMDb dataset from HuggingFace and save to CSV.
-    Combines train (25 000) + test (25 000) = 50 000 reviews.
-
-    Returns: pd.DataFrame with columns ['review', 'sentiment']
-    Raises RuntimeError if download fails.
-    """
+    
     try:
         from datasets import load_dataset
     except ImportError:
@@ -94,19 +70,7 @@ def _download_real_imdb():
 
 
 def download_and_prepare_dataset():
-    """
-    Load the IMDb dataset, enforcing realism checks.
-
-    Decision logic:
-      1. If CSV exists  → load and run realism check.
-         PASS  → return df.
-         FAIL  → delete CSV, print warning, download fresh copy.
-      2. If CSV missing → download fresh copy.
-
-    Returns:
-        pd.DataFrame with columns ['review', 'sentiment']
-        Always real IMDb data — synthetic fallback permanently removed.
-    """
+   
     os.makedirs(DATA_DIR, exist_ok=True)
 
     if os.path.exists(CSV_PATH):
@@ -136,5 +100,4 @@ def download_and_prepare_dataset():
 
 
 def load_dataset():
-    """Alias for backwards compatibility."""
     return download_and_prepare_dataset()
