@@ -1,7 +1,4 @@
-"""
-Exploratory Data Analysis module.
-Generates visualizations for understanding the dataset.
-"""
+
 import os
 import numpy as np
 import pandas as pd
@@ -18,7 +15,6 @@ PLOTS_DIR = "outputs/plots"
 
 
 def plot_class_distribution(df):
-    """Plot the distribution of positive vs negative reviews."""
     set_plot_style()
     fig, ax = plt.subplots(figsize=(8, 5))
 
@@ -41,7 +37,6 @@ def plot_class_distribution(df):
 
 
 def plot_review_length_distribution(df):
-    """Plot histogram of review lengths (word count)."""
     set_plot_style()
     df = df.copy()
     text_col = "cleaned_review" if "cleaned_review" in df.columns else "review"
@@ -68,7 +63,6 @@ def plot_review_length_distribution(df):
 
 
 def plot_word_clouds(df):
-    """Generate word clouds for positive and negative reviews."""
     fig, axes = plt.subplots(1, 2, figsize=(16, 6))
     text_col = "cleaned_review" if "cleaned_review" in df.columns else "review"
 
@@ -91,7 +85,6 @@ def plot_word_clouds(df):
 
 
 def plot_top_words(df, top_n=20):
-    """Plot top N most frequent words for each sentiment class."""
     set_plot_style()
     fig, axes = plt.subplots(1, 2, figsize=(16, 7))
     text_col = "cleaned_review" if "cleaned_review" in df.columns else "review"
@@ -117,7 +110,6 @@ def plot_top_words(df, top_n=20):
 
 
 def plot_review_length_boxplot(df):
-    """Box plot comparing review lengths across sentiment classes."""
     set_plot_style()
     df = df.copy()
     text_col = "cleaned_review" if "cleaned_review" in df.columns else "review"
@@ -136,7 +128,6 @@ def plot_review_length_boxplot(df):
 
 
 def run_eda(df):
-    """Run all EDA visualizations."""
     os.makedirs(PLOTS_DIR, exist_ok=True)
     print("\n" + "=" * 60)
     print("EXPLORATORY DATA ANALYSIS")
@@ -150,10 +141,7 @@ def run_eda(df):
 
 
 def print_dataset_summary(df):
-    """
-    Print a summary table of the dataset.
-    Works both before preprocessing (uses 'review') and after (uses 'cleaned_review').
-    """
+   
     print("\n" + "=" * 60)
     print("DATASET SUMMARY")
     print("=" * 60)
