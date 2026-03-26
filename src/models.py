@@ -1,7 +1,4 @@
-"""
-Machine Learning Models module.
-Implements Logistic Regression, SVM, and Random Forest with training curves.
-"""
+
 import os
 import numpy as np
 import matplotlib
@@ -21,9 +18,7 @@ PLOTS_DIR = "outputs/plots"
 
 
 def get_models():
-    """
-    Return a dictionary of model name -> (model instance, hyperparameter description).
-    """
+
     models = {
         "Logistic Regression": (
             LogisticRegression(
@@ -73,42 +68,26 @@ def get_models():
 
 
 def split_data(X, y, test_size=0.2, random_state=42):
-    """
-    Stratified train-test split.
 
-    Returns:
-        X_train, X_test, y_train, y_test
-    """
     return train_test_split(
         X, y, test_size=test_size, random_state=random_state, stratify=y
     )
 
 
 def train_and_predict(model, X_train, X_test, y_train):
-    """
-    Train a model and return predictions.
 
-    Returns:
-        model, y_pred
-    """
     model.fit(X_train, y_train)
     y_pred = model.predict(X_test)
     return model, y_pred
 
 
 def plot_learning_curves(model, model_name, X, y, feature_name):
-    """
-    Plot the learning curve (training vs validation accuracy) for a model.
-    Used for visualizing the training process.
-    """
+
     set_plot_style()
 
-    # For large sparse matrices, subsample for speed
     n_samples = X.shape[0]
-    # Normalise y to a numpy array so indexing works with list, Series, or ndarray
     y = np.asarray(y)
     if n_samples > 10000:
-        # Subsample to 10000 for learning curve computation
         from sklearn.utils import resample
         indices = resample(range(n_samples), n_samples=10000, random_state=42, stratify=y)
         if issparse(X):
@@ -167,7 +146,6 @@ def plot_learning_curves(model, model_name, X, y, feature_name):
 
 
 def print_hyperparameters(models_dict):
-    """Print hyperparameter descriptions for all models."""
     print("\n" + "=" * 60)
     print("MODEL HYPERPARAMETERS")
     print("=" * 60)
