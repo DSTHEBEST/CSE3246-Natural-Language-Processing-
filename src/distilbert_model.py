@@ -1,65 +1,4 @@
-"""
-DistilBERT Sentiment Classifier
-=================================
-Transformer baseline for:
-  "From Bag-of-Words to Transformers: A Comparative Study of
-   Classical and Contextual Approaches for Sentiment Analysis
-   of Movie Reviews"
 
-Course: CSE3246 – Natural Language Processing
-
-Why DistilBERT over full BERT on laptop hardware
--------------------------------------------------
-| Property               | BERT-base     | DistilBERT      |
-|------------------------|---------------|-----------------|
-| Parameters             | 110 M         | 66 M  (−40 %)   |
-| Inference speed        | 1×            | ~1.6× faster    |
-| Memory (fp32, batch 8) | ~4.5 GB RAM   | ~2.7 GB RAM     |
-| IMDb accuracy          | 92–93 %       | 91–93 %         |
-| Training time (5K, CPU)| ~4–6 h        | ~2–3 h          |
-
-DistilBERT uses knowledge distillation to retain ~97 % of BERT's
-performance at 60 % of the inference cost — the only sensible choice
-for CPU/laptop fine-tuning.
-
-Expected accuracy on IMDb
---------------------------
-  subset 5 000 train  →  89–92 %   (3 epochs)
-  full   40 000 train →  91–93 %   (3 epochs)
-  Compare: LR + TF-IDF best classical = 89.79 %
-
-Next strongest research addition after DistilBERT
---------------------------------------------------
-Domain-Adaptive Pre-Training (DAPT) — Gururangan et al., 2020.
-Continue pre-training DistilBERT on the unlabelled IMDb corpus
-with Masked Language Modelling *before* fine-tuning for sentiment.
-This purely unsupervised step yields +1–2 % accuracy with zero
-additional labels, and is the standard next step in NLP research
-after establishing a fine-tuned transformer baseline.
-
-Public API
-----------
-    from src.distilbert_model import run_distilbert
-
-    metrics = run_distilbert(
-        X_train_text, X_test_text,
-        y_train, y_test,
-        train_subset=5000,
-        test_subset=1000,
-        num_epochs=3,
-        batch_size=8,
-        max_length=256,
-        best_classical={
-            "Model": "Logistic Regression",
-            "Features": "TF-IDF",
-            "Accuracy": 0.8979,
-            "Precision": 0.9003,
-            "Recall": 0.8990,
-            "F1-Score": 0.8996,
-            "MCC": 0.7960,
-        },
-    )
-"""
 
 import os
 import gc
@@ -81,9 +20,7 @@ from sklearn.metrics import (
 
 warnings.filterwarnings("ignore")
 
-# ---------------------------------------------------------------------------
-# Deferred heavy imports — pipeline still runs without torch/transformers
-# ---------------------------------------------------------------------------
+
 _TORCH_OK = False
 try:
     import torch
@@ -99,20 +36,15 @@ try:
 except ImportError:
     pass
 
-# ---------------------------------------------------------------------------
-# Paths
-# ---------------------------------------------------------------------------
+
 PLOTS_DIR   = "outputs/plots"
 RESULTS_CSV = "outputs/experimental_results.csv"
 CKPT_DIR    = "outputs/distilbert_checkpoints"
 MODEL_NAME  = "distilbert-base-uncased"
 
 
-# ===========================================================================
-# Torch Dataset
-# ===========================================================================
+
 class _IMDbDataset(Dataset):
-    """Minimal tokenised IMDb dataset for the Trainer API."""
 
     def __init__(self, texts, labels, tokenizer, max_length=256):
         self.encodings = tokenizer(
@@ -133,11 +65,8 @@ class _IMDbDataset(Dataset):
         return item
 
 
-# ===========================================================================
-# compute_metrics for Trainer
-# ===========================================================================
+
 def _compute_metrics(eval_pred):
-    """Return accuracy, precision, recall, f1, mcc for Trainer evaluation."""
     logits, labels = eval_pred
     preds = np.argmax(logits, axis=-1)
     return {
@@ -155,11 +84,8 @@ def _compute_metrics(eval_pred):
     }
 
 
-# ===========================================================================
-# Helpers: stratified sampling
-# ===========================================================================
+
 def _stratified_sample(texts, labels, n, seed=42):
-    """Return a class-balanced random subsample of size n."""
     if n is None or n >= len(texts):
         return list(texts), list(labels)
     random.seed(seed)
@@ -174,9 +100,7 @@ def _stratified_sample(texts, labels, n, seed=42):
     return list(t), list(l)
 
 
-# ===========================================================================
-# Plots
-# ===========================================================================
+
 def _set_style():
     try:
         plt.style.use("seaborn-v0_8-darkgrid")
@@ -189,7 +113,6 @@ def _set_style():
 
 
 def _plot_confusion_matrix(y_true, y_pred):
-    """Save confusion matrix → outputs/plots/cm_distilbert.png."""
     _set_style()
     cm = confusion_matrix(y_true, y_pred)
     fig, ax = plt.subplots(figsize=(7, 5))
@@ -207,7 +130,6 @@ def _plot_confusion_matrix(y_true, y_pred):
 
 
 def _plot_comparison(distilbert_metrics, best_classical):
-    """Bar chart: DistilBERT vs best classical model."""
     _set_style()
     keys     = ["Accuracy", "Precision", "Recall", "F1-Score", "MCC"]
     db_vals  = [distilbert_metrics.get(k, 0) for k in keys]
@@ -240,7 +162,6 @@ def _plot_comparison(distilbert_metrics, best_classical):
 
 
 def _plot_training_loss(trainer):
-    """Loss curve from Trainer log history (non-critical)."""
     try:
         history = trainer.state.log_history
         tr  = [(e["epoch"], e["loss"])       for e in history if "loss"      in e]
@@ -265,9 +186,7 @@ def _plot_training_loss(trainer):
         pass
 
 
-# ===========================================================================
-# Full metric dict (matches evaluation.compute_all_metrics format)
-# ===========================================================================
+
 def _full_metrics(y_true, y_pred):
     cm          = confusion_matrix(y_true, y_pred)
     tn, fp, fn, tp = cm.ravel()
@@ -299,11 +218,8 @@ def _full_metrics(y_true, y_pred):
     }
 
 
-# ===========================================================================
-# CSV append
-# ===========================================================================
+
 def _append_csv(metrics):
-    """Append DistilBERT row to outputs/experimental_results.csv."""
     row = {
         "Model":       "DistilBERT",
         "Features":    "Contextual Embeddings",
@@ -330,9 +246,6 @@ def _append_csv(metrics):
     print(f"[DistilBERT] Results appended → {RESULTS_CSV}")
 
 
-# ===========================================================================
-# Public entry point
-# ===========================================================================
 def run_distilbert(
     X_train_text,
     X_test_text,
@@ -352,34 +265,7 @@ def run_distilbert(
     # ---- comparison ----
     best_classical: dict = None,
 ):
-    """
-    Fine-tune DistilBERT for binary sentiment classification.
-
-    Parameters
-    ----------
-    X_train_text : list[str]   Raw training review strings
-    X_test_text  : list[str]   Raw test review strings
-    y_train      : list[int]   Training labels (0/1)
-    y_test       : list[int]   Test labels (0/1)
-    train_subset : int         Max training examples (stratified sample).
-                               Set to None to use the full training split.
-    test_subset  : int         Max test examples for evaluation.
-                               Set to None to evaluate on the full test split.
-    num_epochs   : int         Fine-tuning epochs (default 3)
-    batch_size   : int         Per-device batch size.  Use 8 on CPU,
-                               16–32 on GPU.
-    max_length   : int         Tokeniser truncation/padding length.
-                               256 is a good CPU/GPU balance; 512 for max accuracy.
-    best_classical : dict      Metrics for the best classical model used in
-                               the comparison bar chart.
-                               Keys: Model, Features, Accuracy, Precision,
-                                     Recall, F1-Score, MCC
-
-    Returns
-    -------
-    dict  Full metric suite (Accuracy, Precision, Recall, F1-Score, MCC, …)
-          Returns empty dict if transformers/torch are not installed.
-    """
+   
     if not _TORCH_OK:
         print(
             "\n[DistilBERT] ✗ Required packages not found.\n"
@@ -395,7 +281,6 @@ def run_distilbert(
     print("  DISTILBERT TRANSFORMER EXPERIMENT")
     print("=" * 70)
 
-    # ---- device ----
     device   = "cuda" if torch.cuda.is_available() else "cpu"
     use_fp16 = (device == "cuda")
     print(f"[DistilBERT] Device     : {device.upper()}")
@@ -406,33 +291,27 @@ def run_distilbert(
           f"effective {batch_size * gradient_accumulation_steps})")
     print(f"[DistilBERT] Max length : {max_length}")
 
-    # ---- stratified subsampling ----
     X_tr, y_tr = _stratified_sample(X_train_text, y_train, train_subset, seed)
     X_te, y_te = _stratified_sample(X_test_text,  y_test,  test_subset,  seed)
     print(f"[DistilBERT] Train size : {len(X_tr):,}  |  Test size: {len(X_te):,}")
 
-    # ---- hold-out validation split (10 % of train) ----
     val_n    = max(50, int(len(X_tr) * 0.1))
     X_val    = X_tr[-val_n:]; y_val = y_tr[-val_n:]
     X_tr     = X_tr[:-val_n]; y_tr  = y_tr[:-val_n]
     print(f"[DistilBERT] After val split: train={len(X_tr):,}, val={len(X_val):,}")
 
-    # ---- tokeniser ----
     print("[DistilBERT] Loading tokenizer...")
     tokenizer = DistilBertTokenizerFast.from_pretrained(MODEL_NAME)
 
-    # ---- datasets ----
     print("[DistilBERT] Tokenising...")
     train_ds = _IMDbDataset(X_tr,  y_tr,  tokenizer, max_length)
     val_ds   = _IMDbDataset(X_val, y_val, tokenizer, max_length)
     test_ds  = _IMDbDataset(X_te,  y_te,  tokenizer, max_length)
 
-    # ---- model ----
     print("[DistilBERT] Loading pre-trained DistilBERT...")
     model = DistilBertForSequenceClassification.from_pretrained(
         MODEL_NAME, num_labels=2, ignore_mismatched_sizes=True)
 
-    # ---- training arguments ----
     training_args = TrainingArguments(
         output_dir                  = CKPT_DIR,
         num_train_epochs            = num_epochs,
@@ -455,7 +334,6 @@ def run_distilbert(
         push_to_hub                 = False,
     )
 
-    # ---- trainer ----
     trainer = Trainer(
         model           = model,
         args            = training_args,
@@ -465,19 +343,16 @@ def run_distilbert(
         callbacks       = [EarlyStoppingCallback(early_stopping_patience=2)],
     )
 
-    # ---- fine-tune ----
     print("\n[DistilBERT] Starting fine-tuning...")
     trainer.train()
     print("[DistilBERT] Fine-tuning complete.")
 
-    # ---- evaluate on test set ----
     print("[DistilBERT] Evaluating on test set...")
     pred_out  = trainer.predict(test_ds)
     y_pred    = np.argmax(pred_out.predictions, axis=-1)
     y_true    = np.asarray(y_te)
     metrics   = _full_metrics(y_true, y_pred)
 
-    # ---- print results ----
     print("\n" + "=" * 55)
     print("  DistilBERT · Contextual Embeddings — TEST RESULTS")
     print("=" * 55)
@@ -493,7 +368,6 @@ def run_distilbert(
     print(classification_report(y_true, y_pred,
                                 target_names=["Negative", "Positive"]))
 
-    # ---- comparison print ----
     if best_classical:
         print("\n[DistilBERT] Comparison with Best Classical Model:")
         print(f"  {best_classical.get('Model')} + "
@@ -509,14 +383,12 @@ def run_distilbert(
         print(f"    MCC      : {metrics['MCC']:.4f}  "
               f"({'↑ BETTER' if metrics['MCC']       > best_classical.get('MCC', 0)      else '↓ behind'})")
 
-    # ---- save artefacts ----
     _plot_confusion_matrix(y_true, y_pred)
     _plot_training_loss(trainer)
     if best_classical:
         _plot_comparison(metrics, best_classical)
     _append_csv(metrics)
 
-    # ---- memory cleanup ----
     del model, trainer, train_ds, val_ds, test_ds
     gc.collect()
     if device == "cuda":
