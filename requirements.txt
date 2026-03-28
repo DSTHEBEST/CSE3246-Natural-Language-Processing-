@@ -9,3 +9,10 @@ vaderSentiment>=3.3.2
 gensim>=4.3.0
 wordcloud>=1.9.0
 tabulate>=0.9.0
+
+# ---- Transformer extension (Step 9 / bert_model.py) ----
+# Install with: pip install torch transformers datasets accelerate
+torch>=2.0.0
+transformers>=4.38.0
+datasets>=2.18.0
+accelerate>=0.27.0
